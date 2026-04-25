@@ -1,3 +1,36 @@
+### English
+
+I would like to express my sincere gratitude to the original author for providing the foundation for this project.
+
+This version has been refined and adapted by AI specifically for **ESPHome 2026.4.2**. The following enhancements have been implemented:
+* Integrated **i2s_audio_duplex** for advanced audio communication.
+* Added **timer** functionality.
+* Implemented a **"stop"** word feature to interrupt active processes.
+
+This work was inspired by the Home Assistant Voice PE project and the Respeaker Lite ESPHome integration.
+
+---
+
+### Русский
+
+Выражаю искреннюю благодарность автору оригинального репозитория за основу для данного проекта.
+
+Эта версия была доработана с помощью ИИ специально для сборки на **ESPHome 2026.4.2**. Были внесены следующие изменения:
+* Интегрирован компонент **i2s_audio_duplex** для реализации дуплексной связи.
+* Добавлены функции **таймера**.
+* Реализована возможность остановки процессов голосовой командой **«stop»**.
+
+Данная работа вдохновлена проектами Home Assistant Voice PE и интеграцией Respeaker Lite для ESPHome.
+
+---
+
+### Links / Ссылки
+
+* **Original Base / Основа:** [alaltitov/Waveshare-ESP32-P4-86-Panel-ETH-2RO](https://github.com/alaltitov/Waveshare-ESP32-P4-86-Panel-ETH-2RO)
+* **Audio Integration / Интеграция аудио:** [n-IA-hane/esphome-intercom](https://github.com/n-IA-hane/esphome-intercom)
+* **Inspiration / Вдохновение 1:** [Home Assistant Voice YAML](https://github.com/esphome/home-assistant-voice-pe/blob/dev/home-assistant-voice.yaml)
+* **Inspiration / Вдохновение 2:** [Respeaker Lite ESPHome Integration](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/blob/main/config/common/respeaker-satellite-base.yaml)
+
 # LVGL ESPhome Waveshare-ESP32-P4-86-Panel-ETH-2RO custom firmware
 
 <p align="center">
