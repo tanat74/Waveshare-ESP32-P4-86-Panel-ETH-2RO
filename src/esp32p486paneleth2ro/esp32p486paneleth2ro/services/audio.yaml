@@ -1,0 +1,444 @@
+external_components:
+  - source:
+      type: git
+      url: https://github.com/n-IA-hane/esphome-intercom
+      ref: main
+    components: [i2s_audio_duplex, esp_aec]
+
+esp_aec:
+  id: aec_processor
+  sample_rate: 16000
+  mode: sr_low_cost
+  filter_length: 4
+
+i2s_audio_duplex:
+  id: i2s_duplex
+  i2s_mclk_pin: GPIO13
+  i2s_lrclk_pin: GPIO10
+  i2s_bclk_pin: GPIO12
+  i2s_din_pin: GPIO11   # ES7210 SDOUT → ESP (микрофон)
+  i2s_dout_pin: GPIO9   # ESP → ES8311 SDIN (динамик)
+  sample_rate: 48000          # Нативная частота ES8311/ES7210 — лучшее качество DAC
+  output_sample_rate: 16000   # FIR-децимация ×3 для MWW/VA
+  buffers_in_psram: true      # ~28KB внутренней памяти освобождается, нужно для sr_low_cost
+  aec_id: aec_processor
+
+# ES8311 аудио DAC
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    i2c_id: i2c_bus
+    address: 0x18
+    bits_per_sample: 16bit
+    sample_rate: 48000
+    use_mclk: true
+
+audio_adc:
+  - platform: es7210
+    id: es7210_adc
+    i2c_id: i2c_bus
+    address: 0x40
+    bits_per_sample: 16bit
+    sample_rate: 48000
+    mic_gain: 24dB
+
+# Микрофон — используется VA и MWW
+microphone:
+  - platform: i2s_audio_duplex
+    id: esp32_microphone
+    i2s_audio_duplex_id: i2s_duplex
+
+# Динамик (аппаратный выход на I2S шину)
+speaker:
+  - platform: i2s_audio_duplex
+    id: esp32_speaker
+    i2s_audio_duplex_id: i2s_duplex
+    sample_rate: 48000
+
+  - platform: mixer
+    id: audio_mixer
+    output_speaker: esp32_speaker
+    num_channels: 1
+    task_stack_in_psram: true
+    source_speakers:
+      - id: media_speaker_mix
+        timeout: 10s
+        buffer_duration: 100ms
+      - id: tts_speaker_mix
+        timeout: 10s
+        buffer_duration: 100ms
+
+  - platform: resampler
+    id: media_resampling_speaker
+    output_speaker: media_speaker_mix
+    task_stack_in_psram: true
+    sample_rate: 48000
+    bits_per_sample: 16
+
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: tts_speaker_mix
+    task_stack_in_psram: true
+    sample_rate: 48000
+    bits_per_sample: 16
+
+globals:
+  - id: first_active_timer
+    type: voice_assistant::Timer
+    restore_value: false
+  - id: is_timer_active
+    type: bool
+    restore_value: false
+
+switch:
+  # Глобальный переключатель Voice Assistant в Home Assistant
+  - platform: template
+    id: voice_assistant_enabled
+    name: "Voice Assistant Enabled"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    on_turn_on:
+      - if:
+          condition:
+            not:
+              voice_assistant.is_running:
+          then:
+            - micro_wake_word.start
+    on_turn_off:
+      - voice_assistant.stop
+      - micro_wake_word.stop
+      - micro_wake_word.disable_model: stop
+
+  # Усилитель мощности
+  - platform: gpio
+    pin: GPIO53
+    name: "Audio Amplifier"
+    id: audio_amplifier
+    restore_mode: ALWAYS_OFF
+
+  # Таймер — отслеживает звонок таймера
+  - platform: template
+    id: timer_ringing
+    optimistic: true
+    internal: true
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - script.execute: update_time_timer_display
+      - micro_wake_word.enable_model: stop
+      - script.execute: ring_timer
+      - switch.turn_on: audio_amplifier
+      - delay: 15min
+      - switch.turn_off: timer_ringing
+    on_turn_off:
+      - script.execute: check_if_timers_active
+      - script.execute: fetch_first_active_timer
+      - script.execute: update_time_timer_display
+      - micro_wake_word.disable_model: stop
+      - script.execute: disable_repeat
+      - if:
+          condition:
+            media_player.is_announcing:
+              id: speaker_media_player
+          then:
+            media_player.stop:
+              announcement: true
+              id: speaker_media_player
+
+number:
+  - platform: i2s_audio_duplex
+    i2s_audio_duplex_id: i2s_duplex
+    mic_gain:
+      id: mic_gain
+      name: "Mic Gain"
+
+media_player:
+  - platform: speaker
+    name: "ESP32 P4 Media Player"
+    id: speaker_media_player
+    codec_support_enabled: true
+    volume_min: 0.5
+    volume_max: 0.75
+    volume_increment: 0.05
+    files:
+      - id: ok_sound
+        file: sound/siri-sound-effect.flac
+      - id: timer_finished_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+    announcement_pipeline:
+      speaker: announcement_resampling_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+    media_pipeline:
+      speaker: media_resampling_speaker
+      format: FLAC
+      num_channels: 1
+      sample_rate: 48000
+    on_announcement:
+      - switch.turn_on: audio_amplifier
+    on_state:
+      if:
+        condition:
+          and:
+            - switch.is_off: timer_ringing
+            - not:
+                voice_assistant.is_running:
+            - not:
+                media_player.is_announcing:
+        then: []
+    on_play:
+      - switch.turn_on: audio_amplifier
+      - delay: 100ms
+      - if:
+          condition:
+            and:
+              - switch.is_off: timer_ringing
+              - not:
+                  voice_assistant.is_running:
+              - not:
+                  media_player.is_announcing:
+                    id: speaker_media_player
+          then:
+            - micro_wake_word.stop
+            - voice_assistant.stop
+    on_idle:
+      - delay: 100ms
+      - switch.turn_off: audio_amplifier
+      - if:
+          condition:
+            and:
+              - switch.is_on: voice_assistant_enabled
+              - not:
+                  voice_assistant.is_running:
+          then:
+            - micro_wake_word.start
+
+sensor:
+  - platform: template
+    name: "Voice Assistant State"
+    lambda: |-
+      if (id(esp32_microphone).is_running()) {
+        return 1;
+      } else {
+        return 0;
+      }
+    update_interval: 2s
+
+text_sensor:
+  - platform: template
+    name: "Voice Assistant Status"
+    id: voice_status
+    update_interval: 5s
+    lambda: |-
+      if (id(esp32_microphone).is_running()) {
+        return {"Listening"};
+      } else {
+        return {"Idle"};
+      }
+
+micro_wake_word:
+  id: my_wake_word
+  microphone: esp32_microphone
+  stop_after_detection: false
+  models:
+    - model: alexa
+    - model: https://github.com/tanat74/Mila/releases/download/1.0/mila.json
+      id: mila
+      probability_cutoff: 0.9
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+      id: stop
+      internal: true
+      probability_cutoff: 0.55
+  on_wake_word_detected:
+    then:
+      - logger.log:
+          format: "Wake word detected: %s"
+          args: [ 'wake_word.c_str()' ]
+      - if:
+          condition:
+            switch.is_on: timer_ringing
+          then:
+            - switch.turn_off: timer_ringing
+          else:
+            - if:
+                condition:
+                  voice_assistant.is_running:
+                then:
+                  - voice_assistant.stop:
+                else:
+                  - if:
+                      condition:
+                        media_player.is_announcing:
+                          id: speaker_media_player
+                      then:
+                        - media_player.stop:
+                            announcement: true
+                            id: speaker_media_player
+                      else:
+                        - light.turn_on: display_backlight
+                        - lvgl.resume:
+                        - lvgl.page.show: voice_assistant_page
+                        - voice_assistant.start:
+                            wake_word: !lambda return wake_word;
+                            silence_detection: true
+
+voice_assistant:
+  id: va
+  microphone: esp32_microphone
+  media_player: speaker_media_player
+  micro_wake_word: my_wake_word
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  conversation_timeout: 300s
+  on_listening:
+    - lvgl.animimg.update:
+        id: voice_animation
+        src: mila_wait_animation
+    - lvgl.label.update:
+        id: voice_assistant_status_label
+        text: "Слушаю..."
+  on_stt_end:
+    - lvgl.animimg.update:
+        id: voice_animation
+        src: mila_away_animation
+    - lvgl.label.update:
+        id: voice_assistant_status_label
+        text: "Изучаю..."
+  on_tts_start:
+    - lvgl.animimg.update:
+        id: voice_animation
+        src: mila_work_animation
+    - lvgl.label.update:
+        id: voice_assistant_status_label
+        text: "Отвечаю..."
+    - script.execute: activate_stop_word_once
+  on_intent_progress:
+    - if:
+        condition:
+          lambda: 'return !x.empty();'
+        then:
+          - script.execute: activate_stop_word_once
+  on_end:
+    - wait_until:
+        condition:
+          media_player.is_announcing:
+            id: speaker_media_player
+        timeout: 0.5s
+    - wait_until:
+        condition:
+          and:
+            - not:
+                media_player.is_announcing:
+                  id: speaker_media_player
+            - not:
+                media_player.is_playing:
+                  id: speaker_media_player
+    - lvgl.page.show: home_page
+    - if:
+        condition:
+          switch.is_on: voice_assistant_enabled
+        then:
+          - micro_wake_word.start:
+  on_client_connected:
+    - if:
+        condition:
+          switch.is_on: voice_assistant_enabled
+        then:
+          - micro_wake_word.start:
+  on_client_disconnected:
+    - micro_wake_word.stop:
+  on_timer_finished:
+    - switch.turn_on: timer_ringing
+    - script.execute: check_if_timers_active
+    - script.execute: fetch_first_active_timer
+    - script.execute: update_time_timer_display
+  on_timer_started:
+    - script.execute: check_if_timers_active
+    - script.execute: fetch_first_active_timer
+    - script.execute: update_time_timer_display
+  on_timer_cancelled:
+    - script.execute: check_if_timers_active
+    - script.execute: fetch_first_active_timer
+    - script.execute: update_time_timer_display
+  on_timer_updated:
+    - script.execute: check_if_timers_active
+    - script.execute: fetch_first_active_timer
+    - script.execute: update_time_timer_display
+  on_timer_tick:
+    - script.execute: check_if_timers_active
+    - script.execute: fetch_first_active_timer
+    - script.execute: update_time_timer_display
+
+script:
+  - id: ring_timer
+    then:
+      - script.execute: enable_repeat_one
+      - lambda: |-
+          id(speaker_media_player)->play_file(id(timer_finished_sound), true, false);
+
+  - id: enable_repeat_one
+    then:
+      - lambda: |-
+          id(speaker_media_player)
+            ->make_call()
+            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
+            .set_announcement(true)
+            .perform();
+
+  - id: disable_repeat
+    then:
+      - lambda: |-
+          id(speaker_media_player)
+            ->make_call()
+            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_OFF)
+            .set_announcement(true)
+            .perform();
+
+  - id: fetch_first_active_timer
+    then:
+      - lambda: |
+          const auto &timers = id(va).get_timers();
+          if (timers.empty()) return;
+          auto output_timer = *timers.begin();
+          for (const auto &timer : timers) {
+            if (timer.is_active && timer.seconds_left <= output_timer.seconds_left) {
+              output_timer = timer;
+            }
+          }
+          id(first_active_timer) = output_timer;
+
+  - id: check_if_timers_active
+    then:
+      - lambda: |
+          const auto &timers = id(va).get_timers();
+          bool output = false;
+          for (const auto &timer : timers) {
+            if (timer.is_active) output = true;
+          }
+          id(is_timer_active) = output;
+
+  - id: activate_stop_word_once
+    mode: restart
+    then:
+      - wait_until:
+          condition:
+            media_player.is_announcing:
+              id: speaker_media_player
+      - delay: 1s
+      - if:
+          condition:
+            switch.is_off: timer_ringing
+          then:
+            - micro_wake_word.enable_model: stop
+            - wait_until:
+                condition:
+                  not:
+                    media_player.is_announcing:
+                      id: speaker_media_player
+            - if:
+                condition:
+                  switch.is_off: timer_ringing
+                then:
+                  - micro_wake_word.disable_model: stop

@@ -1,0 +1,47 @@
+lvgl:
+  pages:
+    - id: voice_assistant_page
+      bg_color: color_black
+      scrollable: false
+      widgets:
+        - animimg:
+            id: voice_animation
+            y: -50
+            align: center
+            src: mila_wait_animation
+            duration: 1000ms
+            repeat_count: 0
+        - label:
+            id: voice_assistant_status_label
+            y: 200
+            align: center
+            text_font: nunito_72
+            text_color: color_misty_blue
+            text: "Слушаю..."
+
+        # BACK
+        - obj:
+            y: 0
+            width: 120
+            height: 75
+            align: bottom_mid
+            bg_opa: transp
+            pad_all: 0
+            border_opa: transp
+            border_width: 0
+            shadow_opa: transp
+            radius: 0
+            widgets:
+              - obj:
+                  y: -30
+                  width: 120
+                  height: 8
+                  align: bottom_mid
+                  bg_color: color_steel_blue
+                  pad_all: 0
+                  border_opa: transp
+                  border_width: 0
+                  shadow_opa: transp
+                  radius: 23 
+            on_click:
+              - lvgl.page.show: home_page
