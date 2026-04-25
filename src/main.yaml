@@ -117,8 +117,6 @@ esp32_hosted:
 #     sha256: 1b1f6619689543c8a929db56db98a5663965bae9671a4a16436a90f4baa0f012
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
   on_connect:
     - lvgl.label.update:
         id: wifi_status
@@ -186,13 +184,11 @@ light:
             - lvgl.pause:
 
 api:
-  encryption:
-    key: !secret waveshare_key
+  # Encryption key is defined in the root personal config.
 
 ota:
   - platform: esphome
     id: ota_state
-    password: !secret waveshare_ota
     on_begin: 
       - logger.log: "OTA Start"
       - light.turn_on: display_backlight

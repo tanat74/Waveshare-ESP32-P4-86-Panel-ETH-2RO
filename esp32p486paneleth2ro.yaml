@@ -1,0 +1,15 @@
+packages:
+  waveshare-esp32-p4-86-panel-eth-2ro: !include src/main.yaml
+
+wifi:
+  use_address: 192.168.88.31
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+api:
+  encryption:
+    key: !secret waveshare_key
+
+ota:
+  - id: !extend ota_state
+    password: !secret waveshare_ota
