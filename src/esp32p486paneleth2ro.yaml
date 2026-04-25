@@ -1,5 +1,5 @@
 packages:
-  waveshare-esp32-p4-86-panel-eth-2ro: !include src/main.yaml
+  waveshare-esp32-p4-86-panel-eth-2ro: !include main.yaml
 
 wifi:
   use_address: 192.168.88.31
