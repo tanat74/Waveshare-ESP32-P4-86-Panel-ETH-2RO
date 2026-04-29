@@ -156,6 +156,7 @@ media_player:
   - platform: speaker
     name: "ESP32 P4 Media Player"
     id: speaker_media_player
+    buffer_size: 250000
     codec_support_enabled: true
     volume_min: 0.5
     volume_max: 0.75

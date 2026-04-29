@@ -2,7 +2,7 @@
 
 I would like to express my sincere gratitude to the original author for providing the foundation for this project.
 
-This version has been refined and adapted by AI specifically for **ESPHome 2026.4.2**. The following enhancements have been implemented:
+This version has been refined and adapted by AI specifically for **ESPHome 2026.4.3**. The following enhancements have been implemented:
 * Integrated **i2s_audio_duplex** for advanced audio communication.
 * Added **timer** functionality.
 * Implemented a **"stop"** word feature to interrupt active processes.
@@ -15,7 +15,7 @@ This work was inspired by the Home Assistant Voice PE project and the Respeaker 
 
 Выражаю искреннюю благодарность автору оригинального репозитория за основу для данного проекта.
 
-Эта версия была доработана с помощью ИИ специально для сборки на **ESPHome 2026.4.2**. Были внесены следующие изменения:
+Эта версия была доработана с помощью ИИ специально для сборки на **ESPHome 2026.4.3**. Были внесены следующие изменения:
 * Интегрирован компонент **i2s_audio_duplex** для реализации дуплексной связи.
 * Добавлены функции **таймера**.
 * Реализована возможность остановки процессов голосовой командой **«stop»**.

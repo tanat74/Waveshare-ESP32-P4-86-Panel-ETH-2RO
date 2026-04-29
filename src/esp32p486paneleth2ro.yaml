@@ -20,7 +20,7 @@ font: !include esp32p486paneleth2ro/common/fonts.yaml
 color: !include esp32p486paneleth2ro/common/colors.yaml
 
 external_components:
-  - source: github://alaltitov/esphome@dev
+  - source: github://tanat74/esphome@main
     components: [i18n]
     refresh: 1h
 
@@ -81,17 +81,22 @@ esp32:
       CONFIG_CACHE_L2_CACHE_256KB: y
       CONFIG_ESP_TASK_WDT_TIMEOUT_S: "30"
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: y
-      CONFIG_ESP_HOSTED_SDIO_RX_Q_SIZE: "50"
-      CONFIG_ESP_HOSTED_SDIO_TX_Q_SIZE: "50"
+      CONFIG_ESP_HOSTED_SDIO_RX_Q_SIZE: "10"
+      CONFIG_ESP_HOSTED_SDIO_TX_Q_SIZE: "10"
       CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL: "65536"
 
 logger:
-  level: debug
+  level: verbose
+  initial_level: debug
   logs:
     lvgl: info
+    voice_assistant: debug
+    speaker_media_player.pipeline: verbose
+    ring_buffer: verbose
+    online_image: verbose
+    http_request.idf: verbose
+    esp32_hosted: verbose
   hardware_uart: UART0
-
-# debug:
 
 psram:
   mode: hex
@@ -329,7 +334,6 @@ lvgl:
                 bg_color: color_steel_blue
                 indicator:
                   bg_color: color_misty_blue
-
 
 http_request:
   verify_ssl: false

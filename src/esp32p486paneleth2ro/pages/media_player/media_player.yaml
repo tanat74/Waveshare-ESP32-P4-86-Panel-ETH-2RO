@@ -899,19 +899,28 @@ script:
   - id: update_cover_script
     mode: restart
     then:
-      - lambda: |-
-          std::string url = id(pending_cover_url);
-          id(cover_url) = url;
-      - homeassistant.action:
-          action: display_tools.save_media_cover
-          data:
-            entity_id: "${media_player_entity}"
-            size: large
-      - delay: 1s
-      - online_image.release: media_image_jpeg
-      - online_image.set_url:
-          id: media_image_jpeg
-          url: "${ha_server}/local/display_tools/cover.jpeg"
+      - if:
+          condition:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - not:
+                  media_player.is_announcing:
+                    id: speaker_media_player
+          then:
+            - lambda: |-
+                std::string url = id(pending_cover_url);
+                id(cover_url) = url;
+            - homeassistant.action:
+                action: display_tools.save_media_cover
+                data:
+                  entity_id: "${media_player_entity}"
+                  size: large
+            - delay: 1s
+            - online_image.release: media_image_jpeg
+            - online_image.set_url:
+                id: media_image_jpeg
+                url: "${ha_server}/local/display_tools/cover.jpeg"
 
   - id: update_repeat_mode_script
     mode: restart
